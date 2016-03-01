@@ -64,10 +64,10 @@ index 83488da..20a5ef4 100644
  
 diff --git a/java4/frontend/JDime.jadd b/java4/frontend/JDime.jadd
 new file mode 100644
-index 0000000..3582ced
+index 0000000..3a53e04
 --- /dev/null
 +++ b/java4/frontend/JDime.jadd
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,193 @@
 +/*
 + * Copyright (C) 2013-2015 Olaf Lessenich
 + *
@@ -131,10 +131,18 @@ index 0000000..3582ced
 +
 +	public boolean ASTNode.isConflict = false;
 +	public boolean ASTNode.isChoice = false;
-+	public String ASTNode.content = null;
++	private String ASTNode.content = null;
 +
 +	public boolean ASTNode.isContent() {
 +		return content != null;
++	}
++
++	public String ASTNode.getContent() {
++	    return content;
++	}
++
++	public void ASTNode.setContent(String content) {
++	    this.content = content;
 +	}
 +
 +	public ASTNode<?> ASTNode.left;
@@ -255,7 +263,7 @@ index 0000000..3582ced
 +}
 diff --git a/java4/frontend/PrettyPrintJDime.jadd b/java4/frontend/PrettyPrintJDime.jadd
 new file mode 100644
-index 0000000..2b3f8b5
+index 0000000..1cc1911
 --- /dev/null
 +++ b/java4/frontend/PrettyPrintJDime.jadd
 @@ -0,0 +1,496 @@
@@ -344,7 +352,7 @@ index 0000000..2b3f8b5
 +		if (printVirtualNode(sb)) { return; }
 +		Block block = getBlock();
 +		if (block.isContent()) {
-+			sb.append(indent() + block.content);
++			sb.append(indent() + block.getContent());
 +		} else {
 +			refined(sb);
 +		}
@@ -374,7 +382,7 @@ index 0000000..2b3f8b5
 +		if (printVirtualNode(sb)) { return; }
 +		Opt<Block> block = getBlockOpt();
 +		if (block.isContent()) {
-+			sb.append(indent() + block.content);
++			sb.append(indent() + block.getContent());
 +		} else {
 +			refined(sb);
 +		}

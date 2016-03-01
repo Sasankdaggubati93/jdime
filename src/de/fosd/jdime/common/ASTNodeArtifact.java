@@ -161,9 +161,9 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
              */
             String content = astnode.prettyPrint();
             if (astnode instanceof MethodDecl) {
-                ((MethodDecl) astnode).getBlockOpt().content = content;
+                ((MethodDecl) astnode).getBlockOpt().setContent(content);
             } else if (astnode instanceof ConstructorDecl) {
-                ((ConstructorDecl) astnode).getBlock().content = content;
+                ((ConstructorDecl) astnode).getBlock().setContent(content);
             }
         }
 
@@ -238,7 +238,7 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
             clone.setNumber(getNumber());
             clone.cloneMatches(this);
             clone.semistructured = semistructured;
-            clone.astnode.content = astnode.content;
+            clone.astnode.setContent(astnode.getContent());
 
             ArtifactList<ASTNodeArtifact> cloneChildren = new ArtifactList<>();
             for (ASTNodeArtifact child : children) {
@@ -428,7 +428,7 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
         });
 
         if (astnode.isContent() && other.astnode.isContent()) {
-            return astnode.content.equals(other.astnode.content);
+            return astnode.getContent().equals(other.astnode.getContent());
         }
 
         return astnode.matches(other.astnode);
@@ -529,7 +529,7 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
      */
     private void mergeContent(ASTNodeArtifact left, ASTNodeArtifact base, ASTNodeArtifact right, ASTNodeArtifact target) {
         if (left.matches(right)) {
-            target.astnode.content = left.astnode.content;
+            target.astnode.setContent(left.astnode.getContent());
         } else {
             try {
                 File leftContent = File.createTempFile("left", ".java");
@@ -542,17 +542,17 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
                 mergeContent.deleteOnExit();
 
                 FileWriter fw = new FileWriter(leftContent);
-                fw.write(left.astnode.content);
+                fw.write(left.astnode.getContent());
                 fw.close();
 
                 if (base != null && base.astnode != null && base.isLeaf()) {
                     fw = new FileWriter(baseContent);
-                    fw.write(base.astnode.content);
+                    fw.write(base.astnode.getContent());
                     fw.close();
                 }
 
                 fw = new FileWriter(rightContent);
-                fw.write(right.astnode.content);
+                fw.write(right.astnode.getContent());
                 fw.close();
 
                 ArtifactList input = new ArtifactList();
@@ -566,7 +566,7 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
 
                 LinebasedStrategy lbs = new LinebasedStrategy();
                 lbs.merge(new MergeOperation<FileArtifact>(input, targetContent, null, null, false), semiContext);
-                target.astnode.content = targetContent.getContent().trim();
+                target.astnode.setContent(targetContent.getContent().trim());
             } catch (IOException e) {
                 throw new RuntimeException("Could not perform semistructured merge.");
             }
