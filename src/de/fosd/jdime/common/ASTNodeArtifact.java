@@ -38,7 +38,6 @@ import de.fosd.jdime.common.operations.Operation;
 import de.fosd.jdime.merge.Merge;
 import de.fosd.jdime.stats.KeyEnums;
 import de.fosd.jdime.strategy.LinebasedStrategy;
-import de.fosd.jdime.strdump.DumpMode;
 import org.jastadd.extendj.ast.ASTNode;
 import org.jastadd.extendj.ast.BytecodeParser;
 import org.jastadd.extendj.ast.BytecodeReader;
@@ -60,8 +59,6 @@ import static de.fosd.jdime.strdump.DumpMode.PLAINTEXT_TREE;
 public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
 
     private static final Logger LOG = Logger.getLogger(ASTNodeArtifact.class.getCanonicalName());
-
-    private boolean initialized = false;
 
     /**
      * Whether to use semistructured merge. This implies treating everything below
@@ -123,16 +120,12 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
      */
     private ASTNode<?> astnode = null;
 
-    /**
-     * Constructor class.
-     */
     private ASTNodeArtifact() {
         this.astnode = new ASTNode<>();
-        this.initializeChildren();
+        initializeChildren();
     }
 
-    private ASTNodeArtifact(final ASTNode<?> astnode, Revision revision, boolean semistructured) {
-        assert (astnode != null);
+    private ASTNodeArtifact(ASTNode<?> astnode, Revision revision, boolean semistructured) {
         this.semistructured = semistructured;
         this.astnode = astnode;
         setRevision(revision);
@@ -141,16 +134,13 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
 
     private void initializeChildren() {
         ArtifactList<ASTNodeArtifact> children = new ArtifactList<>();
+
         for (int i = 0; i < astnode.getNumChild(); i++) {
-            if (astnode != null) {
-                ASTNodeArtifact child = new ASTNodeArtifact(astnode.getChild(i), getRevision(), semistructured);
-                child.setParent(this);
-                child.setRevision(getRevision());
-                children.add(child);
-                if (!child.initialized) {
-                    child.initializeChildren();
-                }
-            }
+            ASTNodeArtifact child = new ASTNodeArtifact(astnode.getChild(i), getRevision(), semistructured);
+
+            child.setParent(this);
+            child.setRevision(getRevision());
+            children.add(child);
         }
 
         if (semistructured && isMethod()) {
@@ -160,6 +150,7 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
              * instead of the child nodes.
              */
             String content = astnode.prettyPrint();
+
             if (astnode instanceof MethodDecl) {
                 ((MethodDecl) astnode).getBlockOpt().setContent(content);
             } else if (astnode instanceof ConstructorDecl) {
@@ -168,7 +159,6 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
         }
 
         setChildren(children);
-        initialized = true;
     }
 
     /**
