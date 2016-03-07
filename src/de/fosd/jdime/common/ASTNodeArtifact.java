@@ -38,7 +38,7 @@ import de.fosd.jdime.common.operations.Operation;
 import de.fosd.jdime.merge.Merge;
 import de.fosd.jdime.stats.KeyEnums;
 import de.fosd.jdime.strategy.LinebasedStrategy;
-import de.fosd.jdime.strdump.DumpMode;
+import org.apache.commons.io.FileUtils;
 import org.jastadd.extendj.ast.ASTNode;
 import org.jastadd.extendj.ast.BytecodeParser;
 import org.jastadd.extendj.ast.BytecodeReader;
@@ -61,7 +61,10 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
 
     private static final Logger LOG = Logger.getLogger(ASTNodeArtifact.class.getCanonicalName());
 
-    private boolean initialized = false;
+    private static File leftContent;
+    private static File baseContent;
+    private static File rightContent;
+    private static File mergeContent;
 
     /**
      * Whether to use semistructured merge. This implies treating everything below
@@ -123,16 +126,12 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
      */
     private ASTNode<?> astnode = null;
 
-    /**
-     * Constructor class.
-     */
     private ASTNodeArtifact() {
         this.astnode = new ASTNode<>();
-        this.initializeChildren();
+        initializeChildren();
     }
 
-    private ASTNodeArtifact(final ASTNode<?> astnode, Revision revision, boolean semistructured) {
-        assert (astnode != null);
+    private ASTNodeArtifact(ASTNode<?> astnode, Revision revision, boolean semistructured) {
         this.semistructured = semistructured;
         this.astnode = astnode;
         setRevision(revision);
@@ -141,16 +140,13 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
 
     private void initializeChildren() {
         ArtifactList<ASTNodeArtifact> children = new ArtifactList<>();
+
         for (int i = 0; i < astnode.getNumChild(); i++) {
-            if (astnode != null) {
-                ASTNodeArtifact child = new ASTNodeArtifact(astnode.getChild(i), getRevision(), semistructured);
-                child.setParent(this);
-                child.setRevision(getRevision());
-                children.add(child);
-                if (!child.initialized) {
-                    child.initializeChildren();
-                }
-            }
+            ASTNodeArtifact child = new ASTNodeArtifact(astnode.getChild(i), getRevision(), semistructured);
+
+            child.setParent(this);
+            child.setRevision(getRevision());
+            children.add(child);
         }
 
         if (semistructured && isMethod()) {
@@ -160,6 +156,7 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
              * instead of the child nodes.
              */
             String content = astnode.prettyPrint();
+
             if (astnode instanceof MethodDecl) {
                 ((MethodDecl) astnode).getBlockOpt().setContent(content);
             } else if (astnode instanceof ConstructorDecl) {
@@ -168,7 +165,6 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
         }
 
         setChildren(children);
-        initialized = true;
     }
 
     /**
@@ -519,57 +515,88 @@ public class ASTNodeArtifact extends Artifact<ASTNodeArtifact> {
     }
 
     /**
+     * Checks whether the temporary files necessary for semistructured merging have been set up.
+     *
+     * @throws IOException
+     *         if there is an exception creating the files
+     */
+    private void checkFiles() throws IOException {
+
+        if (leftContent == null || baseContent == null || rightContent == null || mergeContent == null) {
+            String suffix = ".java";
+
+            leftContent = File.createTempFile(MergeScenario.LEFT.getName(), suffix);
+            leftContent.deleteOnExit();
+
+            baseContent = File.createTempFile(MergeScenario.BASE.getName(), suffix);
+            baseContent.deleteOnExit();
+
+            rightContent = File.createTempFile(MergeScenario.RIGHT.getName(), suffix);
+            rightContent.deleteOnExit();
+
+            mergeContent = File.createTempFile(MergeScenario.MERGE.getName(), suffix);
+            mergeContent.deleteOnExit();
+        }
+
+        if (FileUtils.sizeOf(mergeContent) > 0) {
+
+            try (FileWriter fw = new FileWriter(mergeContent)) {
+                fw.write(new char[] {});
+            }
+        }
+    }
+
+    /**
      * Perform a semistructured merge. This merges the content of the nodes with
      * a LinebasedStrategy instead of merging the ASTNodeArtifacts of the subtree.
      *
-     * @param left left input artifact
-     * @param base base input artifact
-     * @param right right input artifact
-     * @param target artifact where output of merge is written
+     * @param left
+     *         left input artifact
+     * @param base
+     *         base input artifact
+     * @param right
+     *         right input artifact
+     * @param target
+     *         artifact where output of merge is written
      */
     private void mergeContent(ASTNodeArtifact left, ASTNodeArtifact base, ASTNodeArtifact right, ASTNodeArtifact target) {
+
         if (left.matches(right)) {
             target.astnode.setContent(left.astnode.getContent());
-        } else {
-            try {
-                File leftContent = File.createTempFile("left", ".java");
-                File baseContent = File.createTempFile("base", ".java");
-                File rightContent = File.createTempFile("right", ".java");
-                File mergeContent = File.createTempFile("merge", ".java");
-                leftContent.deleteOnExit();
-                baseContent.deleteOnExit();
-                rightContent.deleteOnExit();
-                mergeContent.deleteOnExit();
+            return;
+        }
 
-                FileWriter fw = new FileWriter(leftContent);
+        try {
+            checkFiles();
+
+            try (FileWriter fw = new FileWriter(leftContent)) {
                 fw.write(left.astnode.getContent());
-                fw.close();
-
-                if (base != null && base.astnode != null && base.isLeaf()) {
-                    fw = new FileWriter(baseContent);
-                    fw.write(base.astnode.getContent());
-                    fw.close();
-                }
-
-                fw = new FileWriter(rightContent);
-                fw.write(right.astnode.getContent());
-                fw.close();
-
-                ArtifactList input = new ArtifactList();
-                input.add(new FileArtifact(leftContent));
-                input.add(new FileArtifact(baseContent));
-                input.add(new FileArtifact(rightContent));
-
-                FileArtifact targetContent = new FileArtifact(mergeContent);
-                MergeContext semiContext = new MergeContext();
-                semiContext.setPretend(false);
-
-                LinebasedStrategy lbs = new LinebasedStrategy();
-                lbs.merge(new MergeOperation<FileArtifact>(input, targetContent, null, null, false), semiContext);
-                target.astnode.setContent(targetContent.getContent().trim());
-            } catch (IOException e) {
-                throw new RuntimeException("Could not perform semistructured merge.");
             }
+
+            if (base != null && base.astnode != null && base.isLeaf()) {
+                try (FileWriter fw = new FileWriter(baseContent)) {
+                    fw.write(base.astnode.getContent());
+                }
+            }
+
+            try (FileWriter fw = new FileWriter(rightContent)) {
+                fw.write(right.astnode.getContent());
+            }
+
+            ArtifactList<FileArtifact> input = new ArtifactList<>();
+            input.add(new FileArtifact(leftContent));
+            input.add(new FileArtifact(baseContent));
+            input.add(new FileArtifact(rightContent));
+
+            FileArtifact targetContent = new FileArtifact(mergeContent);
+            MergeContext semiContext = new MergeContext();
+            semiContext.setPretend(false);
+
+            LinebasedStrategy lbs = new LinebasedStrategy();
+            lbs.merge(new MergeOperation<>(input, targetContent, null, null, false), semiContext);
+            target.astnode.setContent(targetContent.getContent().trim());
+        } catch (IOException e) {
+            throw new RuntimeException("Could not perform semistructured merge.", e);
         }
     }
 
