@@ -26,6 +26,7 @@ package de.fosd.jdime.merge;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import de.fosd.jdime.common.Artifact;
 import de.fosd.jdime.common.MergeContext;
 import de.fosd.jdime.common.MergeScenario;
@@ -36,7 +37,7 @@ import de.fosd.jdime.common.operations.ConflictOperation;
 import de.fosd.jdime.common.operations.DeleteOperation;
 import de.fosd.jdime.common.operations.MergeOperation;
 import de.fosd.jdime.common.operations.Operation;
-import de.fosd.jdime.matcher.Matching;
+import de.fosd.jdime.matcher.matching.Matching;
 import de.fosd.jdime.strdump.DumpMode;
 
 /**
@@ -186,8 +187,7 @@ public class OrderedMerge<T extends Artifact<T>> implements MergeInterface<T> {
                                 LOG.finest(() -> String.format("%s has changes in subtree.", prefix(finalRightChild)));
 
                                 // deletion-insertion conflict
-                                prepareConflictOperation(leftChild, rightChild, target, l, b, r)
-                                        .apply(context);
+                                prepareConflictOperation(leftChild, rightChild, target, l, b, r).apply(context);
 
                                 if (rightIt.hasNext()) {
                                     rightChild = rightIt.next();
@@ -209,8 +209,7 @@ public class OrderedMerge<T extends Artifact<T>> implements MergeInterface<T> {
                             LOG.finest(() -> String.format("%s is a change", prefix(finalRightChild)));
 
                             // rightChild is a change
-                            prepareConflictOperation(leftChild, rightChild, target, l, b, r)
-                                    .apply(context);
+                            prepareConflictOperation(leftChild, rightChild, target, l, b, r).apply(context);
 
                             if (rightIt.hasNext()) {
                                 rightChild = rightIt.next();
